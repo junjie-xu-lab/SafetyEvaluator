@@ -6,7 +6,12 @@ import pandas as pd
 import pytest
 
 from safetyevaluator.metrics import calculate_detector_comparison
-from safetyevaluator.report import build_misclassified_samples_table, generate_multi_detector_excel_report
+from safetyevaluator.report import (
+    build_misclassified_samples_table,
+    generate_multi_detector_excel_report,
+    generate_multi_detector_html_report,
+    generate_multi_detector_pdf_report,
+)
 
 
 def test_excel_report_contains_expected_sheets() -> None:
@@ -62,3 +67,42 @@ def test_combined_misclassified_samples_include_detector_context() -> None:
 
     assert list(errors["Prediction Column"]) == ["prediction_a", "prediction_b"]
     assert set(errors["error_type"]) == {"False Positive", "False Negative"}
+
+
+def test_html_report_contains_detector_sections_and_escapes_values() -> None:
+    data = pd.DataFrame(
+        [
+            {
+                "id": "1",
+                "input": "<script>alert('x')</script>",
+                "label": "Safe",
+                "prediction_a": "Unsafe",
+                "source": "demo",
+                "category": "normal",
+            }
+        ]
+    )
+    comparison = calculate_detector_comparison(data, ["prediction_a"])
+
+    report_html = generate_multi_detector_html_report(comparison)
+
+    assert report_html.startswith("<!DOCTYPE html>")
+    assert "Detector: A" in report_html
+    assert "&lt;script&gt;alert(&#x27;x&#x27;)&lt;/script&gt;" in report_html
+    assert "<script>alert('x')</script>" not in report_html
+
+
+def test_pdf_report_generates_pdf_bytes() -> None:
+    pytest.importorskip("reportlab")
+
+    data = pd.DataFrame(
+        [
+            {"id": "1", "input": "safe", "label": "Safe", "prediction": "Unsafe"},
+            {"id": "2", "input": "unsafe", "label": "Unsafe", "prediction": "Unsafe"},
+        ]
+    )
+    comparison = calculate_detector_comparison(data, ["prediction"])
+
+    report_bytes = generate_multi_detector_pdf_report(comparison)
+
+    assert report_bytes.startswith(b"%PDF")

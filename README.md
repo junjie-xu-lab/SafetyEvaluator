@@ -19,7 +19,7 @@ guard model, API provider, database, IDE, or operating system.
 - Slices metrics by `category` and `source` to locate weak areas.
 - Displays a confusion matrix and raw label distribution chart with matplotlib.
 - Shows false positives and false negatives in a readable error table.
-- Exports Markdown reports, Excel reports, and filtered error-sample CSV files from the browser.
+- Exports Markdown, HTML, Excel, PDF, and filtered error-sample CSV files from the browser.
 - Includes a fictional demo dataset for quick testing.
 
 ## Features
@@ -40,7 +40,9 @@ guard model, API provider, database, IDE, or operating system.
 - Filterable error explorer by detector, error type, category, and source.
 - Markdown report preview before download.
 - Markdown report download.
+- Standalone HTML report download.
 - Excel report download with separate sheets for summary, detector comparison, metrics, group analysis, and errors.
+- PDF report download.
 - Filtered misclassified-sample CSV download.
 
 ## Screenshots
@@ -104,7 +106,7 @@ For multi-detector comparisons, add columns such as `prediction_baseline`, `pred
 
 If optional columns are missing, SafetyEvaluator fills them with empty strings and shows a note in the app and report.
 
-SafetyEvaluator v3 also includes an advanced input configuration panel in the web app. If your CSV already follows the
+SafetyEvaluator also includes an advanced input configuration panel in the web app. If your CSV already follows the
 default format above, leave the panel unchanged. If your file uses different names, you can map source columns such as
 `sample_id`, `prompt`, or `gold_label` to the standard `id`, `input`, and `label` fields.
 
@@ -211,7 +213,7 @@ Each detector gets its own metrics, confusion matrix, group analysis, and miscla
 a detector comparison table sorted by F1 Score, FNR, and FPR. Detector-specific classifications should be stored in
 `prediction_*` columns when you want zero-configuration loading.
 
-In v3, detector columns can also be selected manually in the advanced input configuration panel. This preserves the
+Detector columns can also be selected manually in the advanced input configuration panel. This preserves the
 default workflow while supporting datasets that use custom detector names.
 
 ## Group Analysis
@@ -274,7 +276,8 @@ macOS / Linux:
 The traditional activation commands also work, but they are optional. On Windows PowerShell, `Activate.ps1` may be
 blocked by the default execution policy. SafetyEvaluator does not require activation, so use the commands above instead.
 
-The Excel input and Excel report features use `openpyxl`, which is included in `requirements.txt`.
+The Excel input and Excel report features use `openpyxl`, and the PDF report feature uses `reportlab`. Both are included
+in `requirements.txt`.
 
 ## Run
 
@@ -370,7 +373,9 @@ The Streamlit page shows:
 - Filterable error explorer.
 - Markdown report preview.
 - Markdown report download button.
+- HTML report download button.
 - Excel report download button.
+- PDF report download button.
 - Filtered error-sample CSV download button.
 
 The project includes `.streamlit/config.toml` to disable Streamlit usage-stat collection prompts for a smoother
@@ -380,7 +385,9 @@ The default output filenames are:
 
 ```text
 safety_evaluation_report.md
+safety_evaluation_report.html
 safety_evaluation_report.xlsx
+safety_evaluation_report.pdf
 misclassified_samples_filtered.csv
 ```
 
@@ -396,6 +403,8 @@ The Markdown report includes:
 - Misclassified samples.
 - Notes about `Controversial` handling.
 
+The HTML report contains the same core sections in a standalone browser-readable file.
+
 The Excel report includes:
 
 - `Summary`
@@ -404,6 +413,8 @@ The Excel report includes:
 - `Confusion Matrix`
 - `Group Analysis`
 - `Misclassified Samples`
+
+The PDF report contains a portable summary version of the same evaluation sections for sharing or archiving.
 
 ## Project Structure
 
@@ -460,6 +471,8 @@ The tests cover:
 - Label alias mapping.
 - Manual detector column selection.
 - Excel report generation.
+- HTML report generation.
+- PDF report generation.
 - Combined misclassified-sample export.
 
 ## Current Scope
@@ -473,7 +486,6 @@ It does not include:
 - External model or guard API integration.
 - Database storage.
 - User login.
-- HTML export.
 - EXE, DMG, desktop client, or installer packaging.
 
 ## License
@@ -485,7 +497,6 @@ This project is released under the MIT License. See `LICENSE` for details.
 Possible next steps:
 
 - Multi-class metric views.
-- Additional report formats such as HTML or PDF.
 - More configurable label mappings.
 - GitHub Actions test workflow.
 - Optional screenshots for README demonstration.

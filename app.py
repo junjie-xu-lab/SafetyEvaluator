@@ -16,7 +16,9 @@ from safetyevaluator.metrics import calculate_detector_comparison
 from safetyevaluator.report import (
     build_misclassified_samples_table,
     generate_multi_detector_excel_report,
+    generate_multi_detector_html_report,
     generate_multi_detector_markdown_report,
+    generate_multi_detector_pdf_report,
 )
 from safetyevaluator.visualize import create_confusion_matrix_figure, create_label_distribution_figure
 
@@ -171,6 +173,20 @@ def main() -> None:
         comparison=comparison,
         missing_optional_columns=load_result.missing_optional_columns,
     )
+    html_report = generate_multi_detector_html_report(
+        comparison=comparison,
+        missing_optional_columns=load_result.missing_optional_columns,
+    )
+    try:
+        pdf_report = generate_multi_detector_pdf_report(
+            comparison=comparison,
+            missing_optional_columns=load_result.missing_optional_columns,
+        )
+        pdf_error = ""
+    except RuntimeError as exc:
+        pdf_report = b""
+        pdf_error = str(exc)
+
     st.subheader("Report Preview")
     with st.expander("Markdown report preview", expanded=True):
         preview_limit = 8000
@@ -178,7 +194,7 @@ def main() -> None:
         if len(report_text) > preview_limit:
             st.caption("Preview truncated. Download the Markdown report for the full content.")
 
-    download_columns = st.columns(3)
+    download_columns = st.columns(5)
     with download_columns[0]:
         st.download_button(
             label="Download Markdown Report",
@@ -188,12 +204,29 @@ def main() -> None:
         )
     with download_columns[1]:
         st.download_button(
+            label="Download HTML Report",
+            data=html_report,
+            file_name="safety_evaluation_report.html",
+            mime="text/html",
+        )
+    with download_columns[2]:
+        st.download_button(
             label="Download Excel Report",
             data=excel_report,
             file_name="safety_evaluation_report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-    with download_columns[2]:
+    with download_columns[3]:
+        if pdf_error:
+            st.caption(pdf_error)
+        else:
+            st.download_button(
+                label="Download PDF Report",
+                data=pdf_report,
+                file_name="safety_evaluation_report.pdf",
+                mime="application/pdf",
+            )
+    with download_columns[4]:
         st.download_button(
             label="Download Filtered Error CSV",
             data=filtered_errors.to_csv(index=False).encode("utf-8-sig"),

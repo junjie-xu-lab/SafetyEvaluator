@@ -1,8 +1,10 @@
-"""Markdown report generation for SafetyEvaluator."""
+"""Report generation for SafetyEvaluator."""
 
 from __future__ import annotations
 
+from html import escape
 from io import BytesIO
+from xml.sax.saxutils import escape as escape_xml
 
 import pandas as pd
 
@@ -85,6 +87,135 @@ def generate_multi_detector_excel_report(
         )
         _format_excel_workbook(writer)
 
+    return output.getvalue()
+
+
+def generate_multi_detector_html_report(
+    comparison: DetectorComparisonResult,
+    missing_optional_columns: list[str] | None = None,
+    max_samples: int = 100,
+) -> str:
+    """Generate a self-contained HTML report for one or more detector evaluations."""
+
+    missing_optional_columns = missing_optional_columns or []
+    first_evaluation = next(iter(comparison.evaluations.values()))
+    counts = first_evaluation.raw_label_counts
+    missing_note = ""
+    if missing_optional_columns:
+        missing_note = (
+            "<li>Missing optional columns filled with empty strings: "
+            + escape(", ".join(missing_optional_columns))
+            + "</li>"
+        )
+
+    sections = [
+        "<!DOCTYPE html>",
+        '<html lang="en">',
+        "<head>",
+        '<meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        "<title>Safety Evaluation Report</title>",
+        "<style>",
+        _html_report_css(),
+        "</style>",
+        "</head>",
+        "<body>",
+        "<main>",
+        "<h1>Safety Evaluation Report</h1>",
+        "<section>",
+        "<h2>1. Dataset Summary</h2>",
+        "<ul>",
+        f"<li>Total samples: {first_evaluation.total_samples}</li>",
+        f"<li>Safe: {counts.get('Safe', 0)}</li>",
+        f"<li>Unsafe: {counts.get('Unsafe', 0)}</li>",
+        f"<li>Controversial: {counts.get('Controversial', 0)}</li>",
+        f"<li>Detector count: {len(comparison.evaluations)}</li>",
+        missing_note,
+        "</ul>",
+        "</section>",
+        "<section>",
+        "<h2>2. Binary Mapping Rule</h2>",
+        "<ul>",
+        "<li>Safe remains Safe.</li>",
+        "<li>Unsafe remains Unsafe.</li>",
+        "<li>Controversial is counted as Unsafe.</li>",
+        "</ul>",
+        "</section>",
+        "<section>",
+        "<h2>Detector Comparison</h2>",
+        _dataframe_to_html(comparison.comparison_table),
+        "</section>",
+    ]
+
+    for evaluation in comparison.evaluations.values():
+        sections.extend(_evaluation_to_html_sections(evaluation, max_samples=max_samples))
+
+    sections.extend(["</main>", "</body>", "</html>"])
+    return "\n".join(section for section in sections if section != "")
+
+
+def generate_multi_detector_pdf_report(
+    comparison: DetectorComparisonResult,
+    missing_optional_columns: list[str] | None = None,
+    max_samples: int = 100,
+) -> bytes:
+    """Generate a PDF report for one or more detector evaluations."""
+
+    try:
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import inch
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "PDF report generation requires reportlab. Install dependencies with: "
+            "python -m pip install -r requirements.txt"
+        ) from exc
+
+    missing_optional_columns = missing_optional_columns or []
+    first_evaluation = next(iter(comparison.evaluations.values()))
+    counts = first_evaluation.raw_label_counts
+    output = BytesIO()
+    document = SimpleDocTemplate(
+        output,
+        pagesize=landscape(A4),
+        rightMargin=0.45 * inch,
+        leftMargin=0.45 * inch,
+        topMargin=0.45 * inch,
+        bottomMargin=0.45 * inch,
+        title="Safety Evaluation Report",
+    )
+    styles = getSampleStyleSheet()
+    elements = [
+        Paragraph("Safety Evaluation Report", styles["Title"]),
+        Spacer(1, 10),
+        Paragraph("1. Dataset Summary", styles["Heading2"]),
+        _pdf_key_value_table(
+            [
+                ("Total samples", first_evaluation.total_samples),
+                ("Safe", counts.get("Safe", 0)),
+                ("Unsafe", counts.get("Unsafe", 0)),
+                ("Controversial", counts.get("Controversial", 0)),
+                ("Detector count", len(comparison.evaluations)),
+                (
+                    "Missing optional columns filled with empty strings",
+                    ", ".join(missing_optional_columns) if missing_optional_columns else "None",
+                ),
+            ],
+            styles,
+        ),
+        Spacer(1, 10),
+        Paragraph("2. Binary Mapping Rule", styles["Heading2"]),
+        Paragraph("Safe stays Safe. Unsafe and Controversial count as Unsafe.", styles["BodyText"]),
+        Spacer(1, 10),
+        Paragraph("Detector Comparison", styles["Heading2"]),
+        _dataframe_to_pdf_table(comparison.comparison_table, styles),
+    ]
+
+    for evaluation in comparison.evaluations.values():
+        elements.extend(_evaluation_to_pdf_elements(evaluation, styles, max_samples=max_samples))
+
+    document.build(elements)
     return output.getvalue()
 
 
@@ -265,6 +396,313 @@ def _format_excel_workbook(writer: pd.ExcelWriter) -> None:
             column_letter = column_cells[0].column_letter
             max_length = max(len(str(cell.value or "")) for cell in column_cells)
             worksheet.column_dimensions[column_letter].width = min(max(max_length + 2, 12), 60)
+
+
+def _html_report_css() -> str:
+    """Return compact CSS for the standalone HTML report."""
+
+    return """
+body {
+    margin: 0;
+    background: #f6f7f9;
+    color: #1f2933;
+    font-family: Arial, Helvetica, sans-serif;
+    line-height: 1.45;
+}
+main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 32px 24px 48px;
+}
+h1, h2, h3, h4 {
+    color: #102a43;
+}
+section {
+    margin: 22px 0;
+    padding: 20px;
+    background: #ffffff;
+    border: 1px solid #d9e2ec;
+    border-radius: 6px;
+}
+.table-wrap {
+    overflow-x: auto;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 14px;
+}
+th, td {
+    border: 1px solid #d9e2ec;
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+}
+th {
+    background: #1f4e79;
+    color: #ffffff;
+}
+tr:nth-child(even) td {
+    background: #f8fafc;
+}
+.muted {
+    color: #52606d;
+}
+""".strip()
+
+
+def _evaluation_to_html_sections(evaluation: EvaluationResult, max_samples: int) -> list[str]:
+    """Return HTML sections for one detector evaluation."""
+
+    confusion = evaluation.confusion_matrix
+    metrics_table = pd.DataFrame(
+        [
+            {"Metric": metric_name, "Value": _format_metric(evaluation.metrics[metric_name])}
+            for metric_name in _metric_order()
+        ]
+    )
+    confusion_table = pd.DataFrame(
+        [
+            {"Actual \\ Predicted": "Safe", "Safe": confusion["TN"], "Unsafe": confusion["FP"]},
+            {"Actual \\ Predicted": "Unsafe", "Safe": confusion["FN"], "Unsafe": confusion["TP"]},
+        ]
+    )
+    errors = evaluation.misclassified_samples
+    false_positive_count = int((errors["error_type"] == "False Positive").sum()) if not errors.empty else 0
+    false_negative_count = int((errors["error_type"] == "False Negative").sum()) if not errors.empty else 0
+
+    sections = [
+        "<section>",
+        f"<h2>Detector: {escape(evaluation.detector_name)}</h2>",
+        f'<p class="muted">Prediction column: <code>{escape(evaluation.prediction_column)}</code></p>',
+        "<h3>Metrics</h3>",
+        _dataframe_to_html(metrics_table),
+        "<h3>Confusion Matrix</h3>",
+        _dataframe_to_html(confusion_table),
+        "<h3>Group Analysis</h3>",
+    ]
+    if evaluation.group_metrics:
+        for group_column, group_table in evaluation.group_metrics.items():
+            sections.extend([f"<h4>By <code>{escape(group_column)}</code></h4>", _dataframe_to_html(group_table)])
+    else:
+        sections.append('<p class="muted">No group columns were available.</p>')
+
+    sections.extend(
+        [
+            "<h3>Error Analysis</h3>",
+            "<ul>",
+            f"<li>False Positive count: {false_positive_count}</li>",
+            f"<li>False Negative count: {false_negative_count}</li>",
+            "</ul>",
+            "<h3>Misclassified Samples</h3>",
+        ]
+    )
+
+    if errors.empty:
+        sections.append('<p class="muted">No misclassified samples were found.</p>')
+    else:
+        report_errors = errors.head(max_samples)
+        if len(errors) > max_samples:
+            sections.append(f'<p class="muted">Only the first {max_samples} misclassified samples are shown.</p>')
+        sections.append(_dataframe_to_html(report_errors))
+
+    sections.extend(
+        [
+            "<h3>Notes</h3>",
+            "<p>Controversial samples are counted as Unsafe in binary evaluation.</p>",
+            "</section>",
+        ]
+    )
+    return sections
+
+
+def _dataframe_to_html(data: pd.DataFrame) -> str:
+    """Convert a DataFrame to an escaped HTML table."""
+
+    if data.empty:
+        return '<p class="muted">No data available.</p>'
+
+    header_cells = "".join(f"<th>{escape(str(column))}</th>" for column in data.columns)
+    rows = []
+    for _, row in data.iterrows():
+        cells = "".join(f"<td>{_format_html_cell(row[column])}</td>" for column in data.columns)
+        rows.append(f"<tr>{cells}</tr>")
+
+    return (
+        '<div class="table-wrap">'
+        "<table>"
+        f"<thead><tr>{header_cells}</tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody>"
+        "</table>"
+        "</div>"
+    )
+
+
+def _format_html_cell(value: object) -> str:
+    """Format and escape one HTML table cell."""
+
+    if isinstance(value, float):
+        text = _format_metric(value)
+    else:
+        text = "" if value is None else str(value)
+    return escape(text)
+
+
+def _evaluation_to_pdf_elements(evaluation: EvaluationResult, styles, max_samples: int) -> list:
+    """Return ReportLab flowables for one detector evaluation."""
+
+    from reportlab.platypus import Paragraph, Spacer
+
+    confusion = evaluation.confusion_matrix
+    metrics_table = pd.DataFrame(
+        [
+            {"Metric": metric_name, "Value": _format_metric(evaluation.metrics[metric_name])}
+            for metric_name in _metric_order()
+        ]
+    )
+    confusion_table = pd.DataFrame(
+        [
+            {"Actual \\ Predicted": "Safe", "Safe": confusion["TN"], "Unsafe": confusion["FP"]},
+            {"Actual \\ Predicted": "Unsafe", "Safe": confusion["FN"], "Unsafe": confusion["TP"]},
+        ]
+    )
+    errors = evaluation.misclassified_samples
+    false_positive_count = int((errors["error_type"] == "False Positive").sum()) if not errors.empty else 0
+    false_negative_count = int((errors["error_type"] == "False Negative").sum()) if not errors.empty else 0
+
+    elements = [
+        Spacer(1, 12),
+        Paragraph(f"Detector: {_pdf_text(evaluation.detector_name)}", styles["Heading2"]),
+        Paragraph(f"Prediction column: {_pdf_text(evaluation.prediction_column)}", styles["BodyText"]),
+        Spacer(1, 6),
+        Paragraph("Metrics", styles["Heading3"]),
+        _dataframe_to_pdf_table(metrics_table, styles),
+        Spacer(1, 6),
+        Paragraph("Confusion Matrix", styles["Heading3"]),
+        _dataframe_to_pdf_table(confusion_table, styles),
+        Spacer(1, 6),
+        Paragraph("Group Analysis", styles["Heading3"]),
+    ]
+
+    if evaluation.group_metrics:
+        for group_column, group_table in evaluation.group_metrics.items():
+            elements.extend(
+                [
+                    Paragraph(f"By {_pdf_text(group_column)}", styles["Heading4"]),
+                    _dataframe_to_pdf_table(group_table, styles),
+                    Spacer(1, 6),
+                ]
+            )
+    else:
+        elements.append(Paragraph("No group columns were available.", styles["BodyText"]))
+
+    elements.extend(
+        [
+            Paragraph("Error Analysis", styles["Heading3"]),
+            _pdf_key_value_table(
+                [
+                    ("False Positive count", false_positive_count),
+                    ("False Negative count", false_negative_count),
+                ],
+                styles,
+            ),
+            Spacer(1, 6),
+            Paragraph("Misclassified Samples", styles["Heading3"]),
+        ]
+    )
+
+    if errors.empty:
+        elements.append(Paragraph("No misclassified samples were found.", styles["BodyText"]))
+    else:
+        elements.append(_dataframe_to_pdf_table(errors.head(max_samples), styles))
+        if len(errors) > max_samples:
+            elements.append(
+                Paragraph(f"Only the first {max_samples} misclassified samples are shown.", styles["BodyText"])
+            )
+
+    elements.extend(
+        [
+            Spacer(1, 6),
+            Paragraph("Notes", styles["Heading3"]),
+            Paragraph("Controversial samples are counted as Unsafe in binary evaluation.", styles["BodyText"]),
+        ]
+    )
+    return elements
+
+
+def _pdf_key_value_table(rows: list[tuple[str, object]], styles):
+    """Build a compact ReportLab key-value table."""
+
+    data = [[_pdf_paragraph(key, styles), _pdf_paragraph(value, styles)] for key, value in rows]
+    return _styled_pdf_table(data, has_header=False)
+
+
+def _dataframe_to_pdf_table(data: pd.DataFrame, styles):
+    """Convert a DataFrame to a ReportLab table."""
+
+    if data.empty:
+        return _pdf_paragraph("No data available.", styles)
+
+    table_rows = [[_pdf_paragraph(column, styles) for column in data.columns]]
+    for _, row in data.iterrows():
+        table_rows.append([_pdf_paragraph(row[column], styles) for column in data.columns])
+    return _styled_pdf_table(table_rows, has_header=True)
+
+
+def _styled_pdf_table(data: list[list[object]], has_header: bool):
+    """Apply shared PDF table styling."""
+
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    from reportlab.platypus import Table, TableStyle
+
+    column_count = max(len(data[0]), 1)
+    available_width = 10.6 * inch
+    table = Table(data, repeatRows=1 if has_header else 0, colWidths=[available_width / column_count] * column_count)
+    commands = [
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D9E2EC")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]
+    if has_header:
+        commands.extend(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ]
+        )
+    table.setStyle(TableStyle(commands))
+    return table
+
+
+def _pdf_paragraph(value: object, styles):
+    """Return a safe ReportLab paragraph for table cells."""
+
+    from reportlab.platypus import Paragraph
+
+    if isinstance(value, float):
+        text = _format_metric(value)
+    else:
+        text = "" if value is None else str(value)
+    if len(text) > 500:
+        text = text[:497] + "..."
+    return Paragraph(_pdf_text(text), styles["BodyText"])
+
+
+def _pdf_text(value: object) -> str:
+    """Escape text for ReportLab paragraph XML."""
+
+    return escape_xml("" if value is None else str(value))
+
+
+def _metric_order() -> list[str]:
+    """Return the standard metric display order."""
+
+    return ["Accuracy", "Precision", "Recall", "F1 Score", "FPR", "FNR"]
 
 
 def _append_evaluation_sections(
