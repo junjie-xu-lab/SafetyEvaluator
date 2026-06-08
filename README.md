@@ -14,6 +14,8 @@ guard model, API provider, database, IDE, or operating system.
 - Supports `Safe`, `Unsafe`, and `Controversial` labels.
 - Counts `Controversial` as `Unsafe` in binary evaluation.
 - Computes Accuracy, Precision, Recall, F1 Score, FPR, and FNR.
+- Compares multiple detector prediction columns in one CSV.
+- Slices metrics by `category` and `source` to locate weak areas.
 - Displays a confusion matrix and raw label distribution chart with matplotlib.
 - Shows false positives and false negatives in a readable error table.
 - Exports a Markdown report from the browser.
@@ -27,30 +29,43 @@ guard model, API provider, database, IDE, or operating system.
 - Case-insensitive label normalization.
 - Friendly unsupported-label diagnostics with CSV row numbers.
 - Binary safety evaluation with safe division for zero-denominator cases.
+- Multi-detector comparison for `prediction` and `prediction_*` columns.
+- Group analysis by `category` and `source`.
 - Misclassified sample analysis.
 - Markdown report download.
 
 ## Input CSV Format
 
-The first version supports CSV files only.
+SafetyEvaluator currently supports CSV files.
 
-Standard columns:
+Example columns:
 
 ```text
-id,input,label,prediction,output,source,category
+id,input,label,prediction,prediction_baseline,prediction_strict,source,category
 ```
 
 Required columns:
 
 ```text
-id,input,label,prediction
+id,input,label
 ```
 
 Optional columns:
 
 ```text
-output,source,category
+source,category
 ```
+
+Prediction columns:
+
+```text
+prediction
+prediction_*
+```
+
+At least one prediction column is required. The default single-detector format still uses `prediction`.
+For multi-detector comparisons, add columns such as `prediction_baseline`, `prediction_strict`, or
+`prediction_guard_v2`.
 
 If optional columns are missing, SafetyEvaluator fills them with empty strings and shows a note in the app and report.
 
@@ -59,14 +74,20 @@ Column meanings:
 | Column | Meaning |
 | --- | --- |
 | `id` | Sample identifier |
-| `input` | Input text, prompt, user question, instruction, or other evaluated content |
+| `input` | Evaluated content, such as a prompt, a single-turn input-output pair, or a serialized multi-turn conversation |
 | `label` | Human-annotated ground-truth label |
-| `prediction` | Predicted label from a model, classifier, or safety detector |
-| `output` | Model response content, optional |
+| `prediction` | Predicted label from the default model, classifier, or safety detector |
+| `prediction_*` | Additional detector prediction columns for side-by-side comparison |
 | `source` | Dataset source, optional |
 | `category` | Sample category, optional |
 
 CSV files are read with UTF-8 / UTF-8-SIG compatibility to reduce issues with files exported from Windows Excel.
+
+SafetyEvaluator treats `input` as the full content being evaluated. For prompt-only safety checks, put the prompt in
+`input`. For input-output safety checks, put the combined conversation in `input`, for example
+`User: ... Assistant: ...`. For multi-turn evaluations, serialize the full conversation into `input` with role labels
+or another consistent delimiter. Free-form content fields such as `input` are displayed for review and error analysis,
+but they are not used in metric formulas.
 
 ## Label Rules
 
@@ -81,7 +102,8 @@ Controversial
 SafetyEvaluator cleans labels by trimming spaces and using case-insensitive matching. For example, `safe`, `SAFE`,
 and `Safe` are all normalized to `Safe`.
 
-Unsupported labels are reported clearly in the Streamlit page with row numbers and column names.
+Unsupported labels are reported clearly in the Streamlit page with row numbers and column names. This validation applies
+to the ground-truth `label` column and every detected prediction column.
 
 ## Controversial Handling
 
@@ -126,6 +148,23 @@ Calculated metrics:
 | FNR | `FN / (FN + TP)` |
 
 When a denominator is zero, the metric value is shown as `0`.
+
+## Multi-Detector Comparison
+
+SafetyEvaluator v2 can compare several detector prediction columns from the same CSV. It automatically detects:
+
+- `prediction`
+- Columns beginning with `prediction_`
+
+Each detector gets its own metrics, confusion matrix, group analysis, and misclassified sample table. The app also shows
+a detector comparison table sorted by F1 Score, FNR, and FPR. Detector-specific classifications should be stored in
+`prediction_*` columns.
+
+## Group Analysis
+
+When `category` or `source` columns are available, SafetyEvaluator calculates per-group metrics for each detector.
+This helps identify concentrated failure areas, such as a detector with high false negatives in `jailbreak` samples or
+high false positives in `privacy` samples.
 
 ## Installation
 
@@ -226,11 +265,14 @@ data/demo.csv
 
 It contains examples of:
 
+- Input-output style evaluated content stored in `input`.
 - Correct `Safe` predictions.
 - Correct `Unsafe` predictions.
 - `Safe` to `Unsafe` false positives.
 - `Unsafe` to `Safe` false negatives.
 - `Controversial` labels and predictions.
+- Multiple detector prediction columns.
+- Category-level and source-level group analysis.
 
 The demo data does not contain real sensitive data.
 
@@ -240,8 +282,10 @@ The Streamlit page shows:
 
 - Data preview.
 - Raw label distribution.
+- Detector comparison table.
 - Binary metrics.
 - Confusion matrix.
+- Group analysis by `category` and `source`.
 - Label count bar chart.
 - Misclassified sample table.
 - Markdown report download button.
@@ -259,8 +303,10 @@ The Markdown report includes:
 
 - Dataset summary.
 - Binary mapping rule.
+- Detector comparison.
 - Metrics.
 - Confusion matrix table.
+- Group analysis tables.
 - False positive and false negative counts.
 - Misclassified samples.
 - Notes about `Controversial` handling.
@@ -284,6 +330,7 @@ SafetyEvaluator/
 |   |-- report.py
 |   `-- visualize.py
 |-- tests/
+|   |-- test_loader.py
 |   `-- test_metrics.py
 |-- .streamlit/
 |   `-- config.toml
@@ -306,10 +353,13 @@ The tests cover:
 - False negatives.
 - `Controversial` mapped to `Unsafe`.
 - Zero-denominator metric cases.
+- Group metric calculation.
+- Multi-detector comparison.
+- Prediction column detection in CSV loading.
 
-## First Version Scope
+## Current Scope
 
-This first version is a local Streamlit web app.
+SafetyEvaluator is currently a local Streamlit web app.
 
 It does not include:
 
@@ -330,9 +380,7 @@ This project is released under the MIT License. See `LICENSE` for details.
 Possible next steps:
 
 - Multi-class metric views.
-- Dataset slicing by `source` or `category`.
 - Additional report formats.
 - More configurable label mappings.
-- Batch comparison across multiple detectors.
 - GitHub Actions test workflow.
 - Optional screenshots for README demonstration.

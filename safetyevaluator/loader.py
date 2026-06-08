@@ -9,9 +9,11 @@ from typing import IO
 import pandas as pd
 
 
-REQUIRED_COLUMNS = ["id", "input", "label", "prediction"]
-OPTIONAL_COLUMNS = ["output", "source", "category"]
-STANDARD_COLUMNS = REQUIRED_COLUMNS + OPTIONAL_COLUMNS
+REQUIRED_COLUMNS = ["id", "input", "label"]
+OPTIONAL_COLUMNS = ["source", "category"]
+DEFAULT_PREDICTION_COLUMN = "prediction"
+PREDICTION_COLUMN_PREFIX = "prediction_"
+STANDARD_COLUMNS = REQUIRED_COLUMNS + [DEFAULT_PREDICTION_COLUMN] + OPTIONAL_COLUMNS
 SUPPORTED_LABELS = {"safe": "Safe", "unsafe": "Unsafe", "controversial": "Controversial"}
 
 
@@ -21,6 +23,7 @@ class CsvLoadResult:
 
     data: pd.DataFrame
     missing_optional_columns: list[str]
+    prediction_columns: list[str]
     invalid_labels: pd.DataFrame
 
 
@@ -53,12 +56,16 @@ def load_evaluation_csv(file: str | Path | IO[bytes]) -> CsvLoadResult:
         joined = ", ".join(missing_required)
         raise ValueError(f"Missing required column(s): {joined}")
 
+    prediction_columns = get_prediction_columns(data)
+    if not prediction_columns:
+        raise ValueError("Missing prediction column(s): add 'prediction' or one or more 'prediction_*' columns")
+
     missing_optional = [column for column in OPTIONAL_COLUMNS if column not in data.columns]
     for column in missing_optional:
         data[column] = ""
 
     invalid_rows: list[dict[str, object]] = []
-    for label_column in ["label", "prediction"]:
+    for label_column in ["label", *prediction_columns]:
         normalized_values: list[str] = []
         for row_index, value in data[label_column].items():
             normalized = normalize_label(value)
@@ -75,12 +82,30 @@ def load_evaluation_csv(file: str | Path | IO[bytes]) -> CsvLoadResult:
                 normalized_values.append(normalized)
         data[label_column] = normalized_values
 
-    ordered_columns = STANDARD_COLUMNS + [column for column in data.columns if column not in STANDARD_COLUMNS]
+    standard_columns = REQUIRED_COLUMNS + prediction_columns + OPTIONAL_COLUMNS
+    ordered_columns = standard_columns + [column for column in data.columns if column not in standard_columns]
     data = data[ordered_columns]
     invalid_labels = pd.DataFrame(invalid_rows, columns=["csv_row", "column", "value"])
 
     return CsvLoadResult(
         data=data,
         missing_optional_columns=missing_optional,
+        prediction_columns=prediction_columns,
         invalid_labels=invalid_labels,
     )
+
+
+def get_prediction_columns(data: pd.DataFrame) -> list[str]:
+    """Return supported detector prediction columns in display order."""
+
+    columns = list(data.columns)
+    prediction_columns: list[str] = []
+    if DEFAULT_PREDICTION_COLUMN in columns:
+        prediction_columns.append(DEFAULT_PREDICTION_COLUMN)
+
+    prediction_columns.extend(
+        column
+        for column in columns
+        if column.startswith(PREDICTION_COLUMN_PREFIX) and column != DEFAULT_PREDICTION_COLUMN
+    )
+    return prediction_columns

@@ -5,8 +5,8 @@ from __future__ import annotations
 import streamlit as st
 
 from safetyevaluator.loader import OPTIONAL_COLUMNS, REQUIRED_COLUMNS, load_evaluation_csv
-from safetyevaluator.metrics import calculate_metrics
-from safetyevaluator.report import generate_markdown_report
+from safetyevaluator.metrics import calculate_detector_comparison
+from safetyevaluator.report import generate_multi_detector_markdown_report
 from safetyevaluator.visualize import create_confusion_matrix_figure, create_label_distribution_figure
 
 
@@ -29,11 +29,13 @@ def main() -> None:
     with st.expander("CSV format", expanded=True):
         st.markdown(
             f"""
-            First version supports CSV files only.
+            SafetyEvaluator supports CSV files.
 
             Required columns: `{", ".join(REQUIRED_COLUMNS)}`
 
             Optional columns: `{", ".join(OPTIONAL_COLUMNS)}`
+
+            Prediction columns: `prediction` or one or more `prediction_*` columns
 
             Supported labels: `Safe`, `Unsafe`, `Controversial`
 
@@ -54,6 +56,7 @@ def main() -> None:
         return
 
     data = load_result.data
+    prediction_columns = load_result.prediction_columns
 
     if load_result.missing_optional_columns:
         st.warning(
@@ -66,46 +69,76 @@ def main() -> None:
         st.dataframe(load_result.invalid_labels, use_container_width=True)
         return
 
+    selected_prediction_columns = st.sidebar.multiselect(
+        "Detector columns",
+        options=prediction_columns,
+        default=prediction_columns,
+    )
+    if not selected_prediction_columns:
+        st.warning("Select at least one detector column.")
+        return
+
+    comparison = calculate_detector_comparison(data, selected_prediction_columns)
+
     st.subheader("Data Preview")
     st.dataframe(data.head(50), use_container_width=True)
 
-    evaluation = calculate_metrics(data)
-
     st.subheader("Raw Label Distribution")
-    label_counts = evaluation.raw_label_counts
+    first_evaluation = next(iter(comparison.evaluations.values()))
+    label_counts = first_evaluation.raw_label_counts
     count_columns = st.columns(3)
     count_columns[0].metric("Safe", label_counts.get("Safe", 0))
     count_columns[1].metric("Unsafe", label_counts.get("Unsafe", 0))
     count_columns[2].metric("Controversial", label_counts.get("Controversial", 0))
 
-    st.subheader("Binary Evaluation Metrics")
-    metric_columns = st.columns(6)
-    for column, (metric_name, metric_value) in zip(metric_columns, evaluation.metrics.items()):
-        column.metric(metric_name, f"{metric_value:.4f}")
+    st.subheader("Detector Comparison")
+    st.dataframe(_format_metric_table(comparison.comparison_table), use_container_width=True, hide_index=True)
 
-    chart_columns = st.columns(2)
-    with chart_columns[0]:
-        st.subheader("Confusion Matrix")
-        st.pyplot(create_confusion_matrix_figure(evaluation.confusion_matrix))
+    with st.expander("Raw label chart"):
+        st.pyplot(create_label_distribution_figure(first_evaluation.raw_label_counts))
 
-    with chart_columns[1]:
-        st.subheader("Label Count Bar Chart")
-        st.pyplot(create_label_distribution_figure(evaluation.raw_label_counts))
+    detector_tabs = st.tabs([comparison.evaluations[column].detector_name for column in selected_prediction_columns])
+    for tab, prediction_column in zip(detector_tabs, selected_prediction_columns):
+        evaluation = comparison.evaluations[prediction_column]
+        with tab:
+            st.caption(f"Prediction column: {prediction_column}")
 
-    st.subheader("Error Analysis")
-    errors = evaluation.misclassified_samples
-    if errors.empty:
-        st.success("No misclassified samples were found.")
-    else:
-        false_positive_count = int((errors["error_type"] == "False Positive").sum())
-        false_negative_count = int((errors["error_type"] == "False Negative").sum())
-        error_columns = st.columns(2)
-        error_columns[0].metric("False Positive", false_positive_count)
-        error_columns[1].metric("False Negative", false_negative_count)
-        st.dataframe(errors, use_container_width=True)
+            st.subheader("Binary Evaluation Metrics")
+            metric_columns = st.columns(6)
+            for column, (metric_name, metric_value) in zip(metric_columns, evaluation.metrics.items()):
+                column.metric(metric_name, f"{metric_value:.4f}")
 
-    report_text = generate_markdown_report(
-        evaluation=evaluation,
+            chart_columns = st.columns(2)
+            with chart_columns[0]:
+                st.subheader("Confusion Matrix")
+                st.pyplot(create_confusion_matrix_figure(evaluation.confusion_matrix))
+
+            with chart_columns[1]:
+                st.subheader("Error Summary")
+                errors = evaluation.misclassified_samples
+                false_positive_count = int((errors["error_type"] == "False Positive").sum()) if not errors.empty else 0
+                false_negative_count = int((errors["error_type"] == "False Negative").sum()) if not errors.empty else 0
+                error_columns = st.columns(2)
+                error_columns[0].metric("False Positive", false_positive_count)
+                error_columns[1].metric("False Negative", false_negative_count)
+
+            st.subheader("Group Analysis")
+            if evaluation.group_metrics:
+                group_tabs = st.tabs([f"By {column}" for column in evaluation.group_metrics])
+                for group_tab, (group_column, group_table) in zip(group_tabs, evaluation.group_metrics.items()):
+                    with group_tab:
+                        st.dataframe(_format_metric_table(group_table), use_container_width=True, hide_index=True)
+            else:
+                st.info("No category or source columns were available for group analysis.")
+
+            st.subheader("Misclassified Samples")
+            if errors.empty:
+                st.success("No misclassified samples were found.")
+            else:
+                st.dataframe(errors, use_container_width=True)
+
+    report_text = generate_multi_detector_markdown_report(
+        comparison=comparison,
         missing_optional_columns=load_result.missing_optional_columns,
     )
     st.download_button(
@@ -114,6 +147,14 @@ def main() -> None:
         file_name="safety_evaluation_report.md",
         mime="text/markdown",
     )
+
+
+def _format_metric_table(data):
+    """Format metric columns for Streamlit display."""
+
+    metric_columns = ["Accuracy", "Precision", "Recall", "F1 Score", "FPR", "FNR"]
+    existing_metric_columns = [column for column in metric_columns if column in data.columns]
+    return data.style.format({column: "{:.4f}" for column in existing_metric_columns})
 
 
 if __name__ == "__main__":
