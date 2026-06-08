@@ -43,28 +43,6 @@ guard model, API provider, database, IDE, or operating system.
 - Excel report download with separate sheets for summary, detector comparison, metrics, group analysis, and errors.
 - Filtered misclassified-sample CSV download.
 
-## Screenshots
-
-### Flexible Input
-
-![SafetyEvaluator flexible input](docs/images/safetyevaluator-input.png)
-
-### Advanced Input Configuration
-
-![SafetyEvaluator advanced input configuration](docs/images/safetyevaluator-advanced-config.png)
-
-### Detector Comparison
-
-![SafetyEvaluator detector comparison](docs/images/safetyevaluator-detector-comparison.png)
-
-### Error Explorer
-
-![SafetyEvaluator error explorer](docs/images/safetyevaluator-error-explorer.png)
-
-### Report Preview and Exports
-
-![SafetyEvaluator report preview and exports](docs/images/safetyevaluator-report-preview.png)
-
 ## Input Format
 
 SafetyEvaluator supports three input methods:
