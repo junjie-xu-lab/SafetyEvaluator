@@ -1,8 +1,8 @@
 # SafetyEvaluator
 
 SafetyEvaluator is a lightweight local Streamlit web app for safety classification evaluation.
-It reads CSV files, computes binary safety metrics, analyzes misclassified samples, visualizes results,
-and generates a downloadable Markdown report.
+It reads table-based evaluation data, computes binary safety metrics, analyzes misclassified samples,
+visualizes results, and generates downloadable reports.
 
 The project is intentionally model-agnostic. It is not tied to any specific large language model,
 guard model, API provider, database, IDE, or operating system.
@@ -10,7 +10,8 @@ guard model, API provider, database, IDE, or operating system.
 ## Project Highlights
 
 - Local Streamlit web app for Windows, macOS, and Linux.
-- Generic CSV-based workflow for safety classification results.
+- Generic table-based workflow for safety classification results.
+- Supports CSV upload, Excel `.xlsx` upload, and pasted CSV / TSV text.
 - Supports `Safe`, `Unsafe`, and `Controversial` labels.
 - Counts `Controversial` as `Unsafe` in binary evaluation.
 - Computes Accuracy, Precision, Recall, F1 Score, FPR, and FNR.
@@ -18,25 +19,37 @@ guard model, API provider, database, IDE, or operating system.
 - Slices metrics by `category` and `source` to locate weak areas.
 - Displays a confusion matrix and raw label distribution chart with matplotlib.
 - Shows false positives and false negatives in a readable error table.
-- Exports a Markdown report from the browser.
+- Exports Markdown reports, Excel reports, and filtered error-sample CSV files from the browser.
 - Includes a fictional demo dataset for quick testing.
 
 ## Features
 
 - CSV upload in the Streamlit interface.
+- Excel `.xlsx` upload in the Streamlit interface.
+- Pasted CSV / TSV input in the Streamlit interface.
 - Required column validation.
 - Optional column auto-fill for missing fields.
+- Optional column mapping for files that use custom names such as `prompt`, `gold`, or `model_a`.
+- Optional label alias mapping for values such as `benign` / `harmful` or `0` / `1`.
 - Case-insensitive label normalization.
 - Friendly unsupported-label diagnostics with CSV row numbers.
 - Binary safety evaluation with safe division for zero-denominator cases.
-- Multi-detector comparison for `prediction` and `prediction_*` columns.
+- Multi-detector comparison for `prediction`, `prediction_*`, or manually selected detector columns.
 - Group analysis by `category` and `source`.
 - Misclassified sample analysis.
+- Filterable error explorer by detector, error type, category, and source.
+- Markdown report preview before download.
 - Markdown report download.
+- Excel report download with separate sheets for summary, detector comparison, metrics, group analysis, and errors.
+- Filtered misclassified-sample CSV download.
 
-## Input CSV Format
+## Input Format
 
-SafetyEvaluator currently supports CSV files.
+SafetyEvaluator supports three input methods:
+
+- Upload a CSV file.
+- Upload an Excel `.xlsx` file.
+- Paste CSV or TSV text directly into the web page.
 
 Example columns:
 
@@ -69,6 +82,13 @@ For multi-detector comparisons, add columns such as `prediction_baseline`, `pred
 
 If optional columns are missing, SafetyEvaluator fills them with empty strings and shows a note in the app and report.
 
+SafetyEvaluator v3 also includes an advanced input configuration panel in the web app. If your CSV already follows the
+default format above, leave the panel unchanged. If your file uses different names, you can map source columns such as
+`sample_id`, `prompt`, or `gold_label` to the standard `id`, `input`, and `label` fields.
+
+The same panel also lets you select detector columns manually. This is useful when prediction columns are named
+`baseline_guard`, `strict_guard`, `model_a`, or any other project-specific name instead of `prediction_*`.
+
 Column meanings:
 
 | Column | Meaning |
@@ -82,6 +102,7 @@ Column meanings:
 | `category` | Sample category, optional |
 
 CSV files are read with UTF-8 / UTF-8-SIG compatibility to reduce issues with files exported from Windows Excel.
+Excel `.xlsx` files are read from the first worksheet.
 
 SafetyEvaluator treats `input` as the full content being evaluated. For prompt-only safety checks, put the prompt in
 `input`. For input-output safety checks, put the combined conversation in `input`, for example
@@ -101,6 +122,14 @@ Controversial
 
 SafetyEvaluator cleans labels by trimming spaces and using case-insensitive matching. For example, `safe`, `SAFE`,
 and `Safe` are all normalized to `Safe`.
+
+The advanced input configuration panel can add label aliases without changing the default label rules. For example:
+
+| Alias values | Canonical label |
+| --- | --- |
+| `benign`, `0` | `Safe` |
+| `harmful`, `1` | `Unsafe` |
+| `borderline` | `Controversial` |
 
 Unsupported labels are reported clearly in the Streamlit page with row numbers and column names. This validation applies
 to the ground-truth `label` column and every detected prediction column.
@@ -151,14 +180,17 @@ When a denominator is zero, the metric value is shown as `0`.
 
 ## Multi-Detector Comparison
 
-SafetyEvaluator v2 can compare several detector prediction columns from the same CSV. It automatically detects:
+SafetyEvaluator can compare several detector prediction columns from the same CSV. By default, it automatically detects:
 
 - `prediction`
 - Columns beginning with `prediction_`
 
 Each detector gets its own metrics, confusion matrix, group analysis, and misclassified sample table. The app also shows
 a detector comparison table sorted by F1 Score, FNR, and FPR. Detector-specific classifications should be stored in
-`prediction_*` columns.
+`prediction_*` columns when you want zero-configuration loading.
+
+In v3, detector columns can also be selected manually in the advanced input configuration panel. This preserves the
+default workflow while supporting datasets that use custom detector names.
 
 ## Group Analysis
 
@@ -221,9 +253,12 @@ Install dependencies:
 python -m pip install -r requirements.txt
 ```
 
+The Excel input and Excel report features use `openpyxl`, which is included in `requirements.txt` and installed by the
+helper scripts.
+
 ## Run
 
-Start the local Streamlit app:
+Start the local Streamlit app after activating the virtual environment:
 
 ```bash
 python -m streamlit run app.py
@@ -231,6 +266,15 @@ python -m streamlit run app.py
 
 Streamlit will open the app in your browser. Upload a CSV file, review the metrics and charts, inspect error samples,
 and download the Markdown report.
+
+On Windows, you can also run Streamlit through the project virtual environment without activating it first:
+
+```powershell
+.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+If you see `No module named streamlit`, your terminal is using a Python environment where the dependencies are not
+installed. Use the `.venv\Scripts\python.exe` command above or run `start_windows.bat`.
 
 Optional helper scripts are also provided:
 
@@ -257,13 +301,15 @@ python -m streamlit run app.py
 
 ## Demo Data
 
-A fictional demo dataset is included:
+Fictional demo datasets are included:
 
 ```text
 data/demo.csv
+data/demo.xlsx
+data/demo_custom.csv
 ```
 
-It contains examples of:
+`data/demo.csv` and `data/demo.xlsx` follow the default SafetyEvaluator column names. They contain examples of:
 
 - Input-output style evaluated content stored in `input`.
 - Correct `Safe` predictions.
@@ -273,6 +319,9 @@ It contains examples of:
 - `Controversial` labels and predictions.
 - Multiple detector prediction columns.
 - Category-level and source-level group analysis.
+
+`data/demo_custom.csv` demonstrates v3 input configuration with custom column names, label aliases such as
+`benign` / `harmful` / `1`, and manually selected detector columns.
 
 The demo data does not contain real sensitive data.
 
@@ -288,15 +337,21 @@ The Streamlit page shows:
 - Group analysis by `category` and `source`.
 - Label count bar chart.
 - Misclassified sample table.
+- Filterable error explorer.
+- Markdown report preview.
 - Markdown report download button.
+- Excel report download button.
+- Filtered error-sample CSV download button.
 
 The project includes `.streamlit/config.toml` to disable Streamlit usage-stat collection prompts for a smoother
 first run.
 
-The report filename is:
+The default output filenames are:
 
 ```text
 safety_evaluation_report.md
+safety_evaluation_report.xlsx
+misclassified_samples_filtered.csv
 ```
 
 The Markdown report includes:
@@ -311,6 +366,15 @@ The Markdown report includes:
 - Misclassified samples.
 - Notes about `Controversial` handling.
 
+The Excel report includes:
+
+- `Summary`
+- `Detector Comparison`
+- `Metrics`
+- `Confusion Matrix`
+- `Group Analysis`
+- `Misclassified Samples`
+
 ## Project Structure
 
 ```text
@@ -322,7 +386,9 @@ SafetyEvaluator/
 |-- start_windows.bat
 |-- start_unix.sh
 |-- data/
-|   `-- demo.csv
+|   |-- demo.csv
+|   |-- demo.xlsx
+|   `-- demo_custom.csv
 |-- safetyevaluator/
 |   |-- __init__.py
 |   |-- loader.py
@@ -331,7 +397,8 @@ SafetyEvaluator/
 |   `-- visualize.py
 |-- tests/
 |   |-- test_loader.py
-|   `-- test_metrics.py
+|   |-- test_metrics.py
+|   `-- test_report.py
 |-- .streamlit/
 |   `-- config.toml
 `-- outputs/
@@ -356,6 +423,13 @@ The tests cover:
 - Group metric calculation.
 - Multi-detector comparison.
 - Prediction column detection in CSV loading.
+- Excel workbook input.
+- Pasted CSV / TSV input.
+- Custom column mapping.
+- Label alias mapping.
+- Manual detector column selection.
+- Excel report generation.
+- Combined misclassified-sample export.
 
 ## Current Scope
 
@@ -368,7 +442,7 @@ It does not include:
 - External model or guard API integration.
 - Database storage.
 - User login.
-- Excel or HTML export.
+- HTML export.
 - EXE, DMG, desktop client, or installer packaging.
 
 ## License
@@ -380,7 +454,7 @@ This project is released under the MIT License. See `LICENSE` for details.
 Possible next steps:
 
 - Multi-class metric views.
-- Additional report formats.
+- Additional report formats such as HTML or PDF.
 - More configurable label mappings.
 - GitHub Actions test workflow.
 - Optional screenshots for README demonstration.
