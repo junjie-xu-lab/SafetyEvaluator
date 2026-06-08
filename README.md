@@ -223,34 +223,49 @@ Or download ZIP:
 4. Extract the ZIP file.
 5. Open a terminal in the extracted `SafetyEvaluator` folder.
 
-Create a virtual environment:
+For most users, continue to the Run section and use `python start.py`.
+
+If you prefer manual setup, create a virtual environment:
 
 ```bash
 python -m venv .venv
 ```
 
-Activate it on Windows PowerShell:
+Install dependencies without activating the environment.
+
+Windows PowerShell:
 
 ```powershell
-.venv\Scripts\Activate.ps1
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-Activate it on Windows CMD:
+Windows CMD:
 
 ```bat
-.venv\Scripts\activate.bat
+.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-Activate it on macOS / Linux:
+macOS / Linux:
 
 ```bash
-source .venv/bin/activate
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
-Install dependencies:
+The traditional activation commands also work, but they are optional. On Windows PowerShell, `Activate.ps1` may be
+blocked by the default execution policy. SafetyEvaluator does not require activation, so use the commands above instead.
+
+After manual setup, start the app without activating the environment.
+
+Windows:
+
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+macOS / Linux:
 
 ```bash
-python -m pip install -r requirements.txt
+.venv/bin/python -m streamlit run app.py
 ```
 
 The Excel input and Excel report features use `openpyxl`, which is included in `requirements.txt` and installed by the
@@ -258,23 +273,52 @@ helper scripts.
 
 ## Run
 
-Start the local Streamlit app after activating the virtual environment:
+Recommended first run on Windows, macOS, or Linux:
+
+```bash
+python start.py
+```
+
+On Windows, if `python` is not recognized but the Python launcher is installed, use:
+
+```powershell
+py start.py
+```
+
+`start.py` creates a local `.venv` folder if needed, installs dependencies from `requirements.txt`, and starts the
+Streamlit app. It does not use PowerShell activation scripts, so it avoids the common `Activate.ps1` execution-policy
+block on Windows.
+
+Streamlit will open the app in your browser. Upload a CSV or Excel file, paste CSV / TSV data, review the metrics and
+charts, inspect error samples, and download reports.
+
+If you prefer to manage the environment manually, start the local Streamlit app after activating the virtual environment:
 
 ```bash
 python -m streamlit run app.py
 ```
 
-Streamlit will open the app in your browser. Upload a CSV file, review the metrics and charts, inspect error samples,
-and download the Markdown report.
-
 On Windows, you can also run Streamlit through the project virtual environment without activating it first:
 
 ```powershell
-.venv\Scripts\python.exe -m streamlit run app.py
+.\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
 If you see `No module named streamlit`, your terminal is using a Python environment where the dependencies are not
-installed. Use the `.venv\Scripts\python.exe` command above or run `start_windows.bat`.
+installed. Use `python start.py`, `py start.py`, or the `.venv\Scripts\python.exe` command above.
+
+If PowerShell shows an error that `Activate.ps1` cannot be loaded because script execution is disabled, you do not need
+administrator mode and you do not need to change the system execution policy. Use:
+
+```powershell
+python start.py
+```
+
+or:
+
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
 
 Optional helper scripts are also provided:
 
@@ -283,6 +327,8 @@ Windows:
 ```bat
 start_windows.bat
 ```
+
+If Windows blocks the downloaded `.bat` file, use `python start.py` instead.
 
 macOS / Linux:
 
@@ -293,10 +339,10 @@ sh start_unix.sh
 These helper scripts create a local `.venv` folder if needed, install dependencies from `requirements.txt`,
 and then start the Streamlit app.
 
-The helper scripts are optional. The recommended cross-platform command remains:
+The helper scripts are optional. The recommended cross-platform command is:
 
 ```bash
-python -m streamlit run app.py
+python start.py
 ```
 
 ## Demo Data
@@ -383,6 +429,7 @@ SafetyEvaluator/
 |-- LICENSE
 |-- requirements.txt
 |-- app.py
+|-- start.py
 |-- start_windows.bat
 |-- start_unix.sh
 |-- data/
