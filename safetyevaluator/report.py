@@ -219,6 +219,67 @@ def generate_multi_detector_pdf_report(
     return output.getvalue()
 
 
+def generate_multi_detector_word_report(
+    comparison: DetectorComparisonResult,
+    missing_optional_columns: list[str] | None = None,
+    max_samples: int = 100,
+) -> bytes:
+    """Generate a Word DOCX report for one or more detector evaluations."""
+
+    try:
+        from docx import Document
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.shared import Inches
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Word report generation requires python-docx. Install dependencies with: "
+            "python -m pip install -r requirements.txt"
+        ) from exc
+
+    missing_optional_columns = missing_optional_columns or []
+    first_evaluation = next(iter(comparison.evaluations.values()))
+    counts = first_evaluation.raw_label_counts
+    document = Document()
+    for section in document.sections:
+        section.top_margin = Inches(0.7)
+        section.bottom_margin = Inches(0.7)
+        section.left_margin = Inches(0.7)
+        section.right_margin = Inches(0.7)
+
+    title = document.add_heading("Safety Evaluation Report", level=0)
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    document.add_heading("1. Dataset Summary", level=1)
+    _add_word_key_value_table(
+        document,
+        [
+            ("Total samples", first_evaluation.total_samples),
+            ("Safe", counts.get("Safe", 0)),
+            ("Unsafe", counts.get("Unsafe", 0)),
+            ("Controversial", counts.get("Controversial", 0)),
+            ("Detector count", len(comparison.evaluations)),
+            (
+                "Missing optional columns filled with empty strings",
+                ", ".join(missing_optional_columns) if missing_optional_columns else "None",
+            ),
+        ],
+    )
+
+    document.add_heading("2. Binary Mapping Rule", level=1)
+    for item in ["Safe remains Safe.", "Unsafe remains Unsafe.", "Controversial is counted as Unsafe."]:
+        document.add_paragraph(item, style="List Bullet")
+
+    document.add_heading("Detector Comparison", level=1)
+    _add_dataframe_to_word(document, comparison.comparison_table)
+
+    for evaluation in comparison.evaluations.values():
+        _add_evaluation_to_word(document, evaluation, max_samples=max_samples)
+
+    output = BytesIO()
+    document.save(output)
+    return output.getvalue()
+
+
 def build_misclassified_samples_table(
     comparison: DetectorComparisonResult,
     max_samples: int | None = None,
@@ -677,6 +738,104 @@ def _styled_pdf_table(data: list[list[object]], has_header: bool):
         )
     table.setStyle(TableStyle(commands))
     return table
+
+
+def _add_evaluation_to_word(document, evaluation: EvaluationResult, max_samples: int) -> None:
+    """Append one detector evaluation to a Word document."""
+
+    confusion = evaluation.confusion_matrix
+    metrics_table = pd.DataFrame(
+        [
+            {"Metric": metric_name, "Value": _format_metric(evaluation.metrics[metric_name])}
+            for metric_name in _metric_order()
+        ]
+    )
+    confusion_table = pd.DataFrame(
+        [
+            {"Actual \\ Predicted": "Safe", "Safe": confusion["TN"], "Unsafe": confusion["FP"]},
+            {"Actual \\ Predicted": "Unsafe", "Safe": confusion["FN"], "Unsafe": confusion["TP"]},
+        ]
+    )
+    errors = evaluation.misclassified_samples
+    false_positive_count = int((errors["error_type"] == "False Positive").sum()) if not errors.empty else 0
+    false_negative_count = int((errors["error_type"] == "False Negative").sum()) if not errors.empty else 0
+
+    document.add_heading(f"Detector: {evaluation.detector_name}", level=1)
+    document.add_paragraph(f"Prediction column: {evaluation.prediction_column}")
+
+    document.add_heading("Metrics", level=2)
+    _add_dataframe_to_word(document, metrics_table)
+
+    document.add_heading("Confusion Matrix", level=2)
+    _add_dataframe_to_word(document, confusion_table)
+
+    document.add_heading("Group Analysis", level=2)
+    if evaluation.group_metrics:
+        for group_column, group_table in evaluation.group_metrics.items():
+            document.add_heading(f"By {group_column}", level=3)
+            _add_dataframe_to_word(document, group_table)
+    else:
+        document.add_paragraph("No group columns were available.")
+
+    document.add_heading("Error Analysis", level=2)
+    _add_word_key_value_table(
+        document,
+        [
+            ("False Positive count", false_positive_count),
+            ("False Negative count", false_negative_count),
+        ],
+    )
+
+    document.add_heading("Misclassified Samples", level=2)
+    if errors.empty:
+        document.add_paragraph("No misclassified samples were found.")
+    else:
+        if len(errors) > max_samples:
+            document.add_paragraph(f"Only the first {max_samples} misclassified samples are shown.")
+        _add_dataframe_to_word(document, errors.head(max_samples))
+
+    document.add_heading("Notes", level=2)
+    document.add_paragraph("Controversial samples are counted as Unsafe in binary evaluation.")
+
+
+def _add_word_key_value_table(document, rows: list[tuple[str, object]]) -> None:
+    """Add a compact key-value table to a Word document."""
+
+    data = pd.DataFrame([{"Item": key, "Value": value} for key, value in rows])
+    _add_dataframe_to_word(document, data)
+
+
+def _add_dataframe_to_word(document, data: pd.DataFrame) -> None:
+    """Add a DataFrame as a Word table."""
+
+    if data.empty:
+        document.add_paragraph("No data available.")
+        return
+
+    table = document.add_table(rows=1, cols=len(data.columns))
+    table.style = "Table Grid"
+    table.autofit = True
+
+    header_cells = table.rows[0].cells
+    for index, column in enumerate(data.columns):
+        header_cells[index].text = str(column)
+
+    for _, row in data.iterrows():
+        cells = table.add_row().cells
+        for index, column in enumerate(data.columns):
+            cells[index].text = _format_word_cell(row[column])
+
+    document.add_paragraph()
+
+
+def _format_word_cell(value: object) -> str:
+    """Format one Word table cell as plain text."""
+
+    if isinstance(value, float):
+        text = _format_metric(value)
+    else:
+        text = "" if value is None else str(value)
+    return text.replace("\r", " ").strip()
 
 
 def _pdf_paragraph(value: object, styles):

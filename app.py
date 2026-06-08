@@ -19,6 +19,7 @@ from safetyevaluator.report import (
     generate_multi_detector_html_report,
     generate_multi_detector_markdown_report,
     generate_multi_detector_pdf_report,
+    generate_multi_detector_word_report,
 )
 from safetyevaluator.visualize import create_confusion_matrix_figure, create_label_distribution_figure
 
@@ -186,6 +187,15 @@ def main() -> None:
     except RuntimeError as exc:
         pdf_report = b""
         pdf_error = str(exc)
+    try:
+        word_report = generate_multi_detector_word_report(
+            comparison=comparison,
+            missing_optional_columns=load_result.missing_optional_columns,
+        )
+        word_error = ""
+    except RuntimeError as exc:
+        word_report = b""
+        word_error = str(exc)
 
     st.subheader("Report Preview")
     with st.expander("Markdown report preview", expanded=True):
@@ -194,29 +204,41 @@ def main() -> None:
         if len(report_text) > preview_limit:
             st.caption("Preview truncated. Download the Markdown report for the full content.")
 
-    download_columns = st.columns(5)
-    with download_columns[0]:
+    report_download_columns = st.columns(3)
+    with report_download_columns[0]:
         st.download_button(
             label="Download Markdown Report",
             data=report_text,
             file_name="safety_evaluation_report.md",
             mime="text/markdown",
         )
-    with download_columns[1]:
+    with report_download_columns[1]:
         st.download_button(
             label="Download HTML Report",
             data=html_report,
             file_name="safety_evaluation_report.html",
             mime="text/html",
         )
-    with download_columns[2]:
+    with report_download_columns[2]:
+        if word_error:
+            st.caption(word_error)
+        else:
+            st.download_button(
+                label="Download Word Report",
+                data=word_report,
+                file_name="safety_evaluation_report.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+
+    data_download_columns = st.columns(3)
+    with data_download_columns[0]:
         st.download_button(
             label="Download Excel Report",
             data=excel_report,
             file_name="safety_evaluation_report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-    with download_columns[3]:
+    with data_download_columns[1]:
         if pdf_error:
             st.caption(pdf_error)
         else:
@@ -226,7 +248,7 @@ def main() -> None:
                 file_name="safety_evaluation_report.pdf",
                 mime="application/pdf",
             )
-    with download_columns[4]:
+    with data_download_columns[2]:
         st.download_button(
             label="Download Filtered Error CSV",
             data=filtered_errors.to_csv(index=False).encode("utf-8-sig"),

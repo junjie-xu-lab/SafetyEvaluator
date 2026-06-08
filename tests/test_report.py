@@ -11,6 +11,7 @@ from safetyevaluator.report import (
     generate_multi_detector_excel_report,
     generate_multi_detector_html_report,
     generate_multi_detector_pdf_report,
+    generate_multi_detector_word_report,
 )
 
 
@@ -106,3 +107,42 @@ def test_pdf_report_generates_pdf_bytes() -> None:
     report_bytes = generate_multi_detector_pdf_report(comparison)
 
     assert report_bytes.startswith(b"%PDF")
+
+
+def test_word_report_contains_core_sections() -> None:
+    pytest.importorskip("docx")
+    from docx import Document
+
+    data = pd.DataFrame(
+        [
+            {
+                "id": "1",
+                "input": "safe",
+                "label": "Safe",
+                "prediction_baseline": "Unsafe",
+                "prediction_strict": "Safe",
+                "source": "demo",
+                "category": "normal",
+            },
+            {
+                "id": "2",
+                "input": "unsafe",
+                "label": "Unsafe",
+                "prediction_baseline": "Unsafe",
+                "prediction_strict": "Unsafe",
+                "source": "demo",
+                "category": "cyber",
+            },
+        ]
+    )
+    comparison = calculate_detector_comparison(data, ["prediction_baseline", "prediction_strict"])
+
+    report_bytes = generate_multi_detector_word_report(comparison)
+    document = Document(BytesIO(report_bytes))
+    paragraph_text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+
+    assert report_bytes.startswith(b"PK")
+    assert "Safety Evaluation Report" in paragraph_text
+    assert "Detector: Baseline" in paragraph_text
+    assert "Detector: Strict" in paragraph_text
+    assert any("Detector" in cell.text for table in document.tables for cell in table.rows[0].cells)

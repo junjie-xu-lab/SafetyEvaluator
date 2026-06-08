@@ -19,7 +19,7 @@ guard model, API provider, database, IDE, or operating system.
 - Slices metrics by `category` and `source` to locate weak areas.
 - Displays a confusion matrix and raw label distribution chart with matplotlib.
 - Shows false positives and false negatives in a readable error table.
-- Exports Markdown, HTML, Excel, PDF, and filtered error-sample CSV files from the browser.
+- Exports Markdown, HTML, Excel, PDF, Word, and filtered error-sample CSV files from the browser.
 - Includes a fictional demo dataset for quick testing.
 
 ## Features
@@ -43,6 +43,7 @@ guard model, API provider, database, IDE, or operating system.
 - Standalone HTML report download.
 - Excel report download with separate sheets for summary, detector comparison, metrics, group analysis, and errors.
 - PDF report download.
+- Word `.docx` report download.
 - Filtered misclassified-sample CSV download.
 
 ## Screenshots
@@ -276,8 +277,8 @@ macOS / Linux:
 The traditional activation commands also work, but they are optional. On Windows PowerShell, `Activate.ps1` may be
 blocked by the default execution policy. SafetyEvaluator does not require activation, so use the commands above instead.
 
-The Excel input and Excel report features use `openpyxl`, and the PDF report feature uses `reportlab`. Both are included
-in `requirements.txt`.
+The Excel input and Excel report features use `openpyxl`, the PDF report feature uses `reportlab`, and the Word report
+feature uses `python-docx`. These dependencies are included in `requirements.txt`.
 
 ## Run
 
@@ -353,7 +354,7 @@ data/demo_custom.csv
 - Multiple detector prediction columns.
 - Category-level and source-level group analysis.
 
-`data/demo_custom.csv` demonstrates v3 input configuration with custom column names, label aliases such as
+`data/demo_custom.csv` demonstrates advanced input configuration with custom column names, label aliases such as
 `benign` / `harmful` / `1`, and manually selected detector columns.
 
 The demo data does not contain real sensitive data.
@@ -376,6 +377,7 @@ The Streamlit page shows:
 - HTML report download button.
 - Excel report download button.
 - PDF report download button.
+- Word report download button.
 - Filtered error-sample CSV download button.
 
 The project includes `.streamlit/config.toml` to disable Streamlit usage-stat collection prompts for a smoother
@@ -388,6 +390,7 @@ safety_evaluation_report.md
 safety_evaluation_report.html
 safety_evaluation_report.xlsx
 safety_evaluation_report.pdf
+safety_evaluation_report.docx
 misclassified_samples_filtered.csv
 ```
 
@@ -415,6 +418,9 @@ The Excel report includes:
 - `Misclassified Samples`
 
 The PDF report contains a portable summary version of the same evaluation sections for sharing or archiving.
+
+The Word report contains the same core evaluation sections in `.docx` format. If you only need a simple readable report
+or do not need Word editing, the Markdown report remains the simplest export option.
 
 ## Project Structure
 
@@ -473,6 +479,7 @@ The tests cover:
 - Excel report generation.
 - HTML report generation.
 - PDF report generation.
+- Word report generation.
 - Combined misclassified-sample export.
 
 ## Current Scope
