@@ -216,9 +216,6 @@ The helper scripts are optional. The recommended cross-platform command remains:
 python -m streamlit run app.py
 ```
 
-Like most Python GitHub projects, dependencies are not committed into the repository. They are declared in
-`requirements.txt` and installed locally by each user. This keeps the repository small and cross-platform.
-
 ## Demo Data
 
 A fictional demo dataset is included:

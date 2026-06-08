@@ -101,7 +101,7 @@ def generate_markdown_report(
 
 
 def _format_metric(value: float) -> str:
-    """Format a metric as a percentage with four decimal places."""
+    """Format a metric with four decimal places."""
 
     return f"{value:.4f}"
 

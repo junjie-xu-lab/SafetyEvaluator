@@ -36,9 +36,10 @@ def create_label_distribution_figure(label_counts: dict[str, int]):
     if not labels:
         labels = ["Safe", "Unsafe", "Controversial"]
     counts = [label_counts.get(label, 0) for label in labels]
+    color_map = {"Safe": "#2E7D32", "Unsafe": "#C62828", "Controversial": "#F9A825"}
 
     fig, ax = plt.subplots(figsize=(5, 4))
-    bars = ax.bar(labels, counts, color=["#2E7D32", "#C62828", "#F9A825"][: len(labels)])
+    bars = ax.bar(labels, counts, color=[color_map[label] for label in labels])
     ax.set_title("Raw Label Distribution")
     ax.set_ylabel("Count")
     ax.set_ylim(0, max(counts + [1]) * 1.2)
