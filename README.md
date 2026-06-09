@@ -504,6 +504,7 @@ This project is released under the MIT License. See `LICENSE` for details.
 Possible next steps:
 
 - Multi-class metric views.
-- More configurable label mappings.
+- Reusable label-mapping presets that can be saved and applied across datasets.
+- Side-by-side comparison exports for selected detectors only.
 - GitHub Actions test workflow.
-- Optional screenshots for README demonstration.
+- Example exported reports attached to GitHub Releases.
