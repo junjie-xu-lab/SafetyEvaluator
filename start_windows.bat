@@ -2,40 +2,21 @@
 setlocal
 cd /d "%~dp0"
 
-if not exist ".venv\Scripts\python.exe" (
-    echo Creating virtual environment...
-    python -m venv .venv
-    if errorlevel 1 (
-        echo.
-        echo Could not create the virtual environment with "python".
-        echo If Python is installed through the Windows launcher, try:
-        echo py start.py
-        pause
-        exit /b 1
-    )
+where python >nul 2>nul
+if not errorlevel 1 (
+    python start.py %*
+    exit /b %errorlevel%
 )
 
-echo Installing dependencies...
-".venv\Scripts\python.exe" -m pip install --upgrade pip
-if errorlevel 1 (
-    echo.
-    echo Could not upgrade pip.
-    pause
-    exit /b 1
-)
-".venv\Scripts\python.exe" -m pip install -r requirements.txt
-if errorlevel 1 (
-    echo.
-    echo Could not install dependencies from requirements.txt.
-    pause
-    exit /b 1
+where py >nul 2>nul
+if not errorlevel 1 (
+    py start.py %*
+    exit /b %errorlevel%
 )
 
-echo Starting SafetyEvaluator...
-".venv\Scripts\python.exe" -m streamlit run app.py
-if errorlevel 1 (
-    echo.
-    echo SafetyEvaluator stopped with an error.
-    pause
-    exit /b 1
-)
+echo.
+echo Could not find Python.
+echo Install Python 3.11 or newer, then run:
+echo python start.py
+pause
+exit /b 1

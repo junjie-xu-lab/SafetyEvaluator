@@ -306,6 +306,12 @@ python start.py
 ```
 
 `start.py` works on Windows, macOS, and Linux. It creates `.venv` if needed, installs dependencies, and starts the app.
+If the default PyPI connection is blocked or unstable, you can run the launcher with a package mirror:
+
+```bash
+python start.py --pip-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
 On Windows, if `python` is not recognized but the Python launcher is installed, use:
 
 ```powershell
@@ -332,6 +338,19 @@ Troubleshooting:
 
 - If PowerShell blocks `Activate.ps1`, do not change system policy. Use `.\.venv\Scripts\python.exe -m streamlit run app.py`.
 - If you see `No module named streamlit`, install dependencies with `.\.venv\Scripts\python.exe -m pip install -r requirements.txt`.
+- If dependency installation shows SSL errors such as `SSLEOFError`, the Python packages were not downloaded from PyPI.
+  Use a package mirror and then start the app again:
+
+  ```powershell
+  python start.py --pip-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+  ```
+
+  Or install dependencies manually with the mirror:
+
+  ```powershell
+  .\.venv\Scripts\python.exe -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+  .\.venv\Scripts\python.exe -m streamlit run app.py
+  ```
 
 ## Demo Data
 
