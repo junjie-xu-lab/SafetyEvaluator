@@ -230,7 +230,7 @@ You can download the project either by cloning the GitHub repository or by downl
 Prerequisite:
 
 ```text
-Python 3.11+
+Python 3.10+
 ```
 
 Clone with Git:
@@ -309,7 +309,13 @@ python start.py
 If the default PyPI connection is blocked or unstable, you can run the launcher with a package mirror:
 
 ```bash
-python start.py --pip-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+python start.py --pip-index-url https://pypi.tuna.tsinghua.edu.cn/simple --pip-timeout 180
+```
+
+If that mirror is slow or times out, try another mirror:
+
+```bash
+python start.py --pip-index-url https://mirrors.aliyun.com/pypi/simple/ --pip-timeout 180
 ```
 
 On Windows, if `python` is not recognized but the Python launcher is installed, use:
@@ -342,15 +348,25 @@ Troubleshooting:
   Use a package mirror and then start the app again:
 
   ```powershell
-  python start.py --pip-index-url https://pypi.tuna.tsinghua.edu.cn/simple
+  python start.py --pip-index-url https://pypi.tuna.tsinghua.edu.cn/simple --pip-timeout 180
   ```
 
-  Or install dependencies manually with the mirror:
+- If dependency installation shows `ReadTimeoutError`, the package source is reachable but the download is too slow or
+  unstable. Retry with a longer timeout or another mirror:
 
   ```powershell
-  .\.venv\Scripts\python.exe -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+  python start.py --pip-index-url https://mirrors.aliyun.com/pypi/simple/ --pip-timeout 180
+  ```
+
+- Or install dependencies manually with the mirror:
+
+  ```powershell
+  .\.venv\Scripts\python.exe -m pip install --timeout 180 --retries 10 --prefer-binary -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
   .\.venv\Scripts\python.exe -m streamlit run app.py
   ```
+
+  If the official PyPI source and multiple mirrors all time out, use a more stable network or a system proxy/VPN, then
+  run the launcher again.
 
 ## Demo Data
 
@@ -448,6 +464,7 @@ SafetyEvaluator/
 |-- README.md
 |-- LICENSE
 |-- requirements.txt
+|-- requirements-dev.txt
 |-- app.py
 |-- start.py
 |-- start_windows.bat
@@ -477,6 +494,7 @@ SafetyEvaluator/
 Run the test suite:
 
 ```bash
+python -m pip install -r requirements-dev.txt
 python -m pytest
 ```
 

@@ -27,7 +27,19 @@ def main() -> int:
         venv.create(VENV_DIR, with_pip=True)
 
     print("Installing dependencies...")
-    install_command = [str(venv_python), "-m", "pip", "install", "-r", str(PROJECT_ROOT / "requirements.txt")]
+    install_command = [
+        str(venv_python),
+        "-m",
+        "pip",
+        "install",
+        "--timeout",
+        str(args.pip_timeout),
+        "--retries",
+        str(args.pip_retries),
+        "--prefer-binary",
+        "-r",
+        str(PROJECT_ROOT / "requirements.txt"),
+    ]
     if args.pip_index_url:
         install_command.extend(["-i", args.pip_index_url])
     if _run(install_command) != 0:
@@ -45,6 +57,18 @@ def _parse_args():
     parser.add_argument(
         "--pip-index-url",
         help="Use a custom Python package index when the default PyPI connection is blocked or unstable.",
+    )
+    parser.add_argument(
+        "--pip-timeout",
+        type=int,
+        default=120,
+        help="Seconds to wait for package downloads before pip times out. Default: 120.",
+    )
+    parser.add_argument(
+        "--pip-retries",
+        type=int,
+        default=10,
+        help="Number of pip download retries. Default: 10.",
     )
     return parser.parse_args()
 
@@ -76,18 +100,25 @@ def _print_dependency_help(pip_index_url: str | None) -> None:
     print()
     if os.name == "nt":
         print("1. Use a Python package mirror:")
-        print("   python start.py --pip-index-url https://pypi.tuna.tsinghua.edu.cn/simple")
+        print("   python start.py --pip-index-url https://pypi.tuna.tsinghua.edu.cn/simple --pip-timeout 180")
         print()
-        print("2. Or install dependencies manually with the mirror:")
-        print("   .\\.venv\\Scripts\\python.exe -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple")
+        print("2. Try another mirror if the first one times out:")
+        print("   python start.py --pip-index-url https://mirrors.aliyun.com/pypi/simple/ --pip-timeout 180")
+        print()
+        print("3. Or install dependencies manually with the mirror:")
+        print("   .\\.venv\\Scripts\\python.exe -m pip install --timeout 180 --retries 10 --prefer-binary -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple")
     else:
         print("1. Use a Python package mirror:")
-        print("   python start.py --pip-index-url https://pypi.tuna.tsinghua.edu.cn/simple")
+        print("   python start.py --pip-index-url https://pypi.tuna.tsinghua.edu.cn/simple --pip-timeout 180")
         print()
-        print("2. Or install dependencies manually with the mirror:")
-        print("   .venv/bin/python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple")
+        print("2. Try another mirror if the first one times out:")
+        print("   python start.py --pip-index-url https://mirrors.aliyun.com/pypi/simple/ --pip-timeout 180")
+        print()
+        print("3. Or install dependencies manually with the mirror:")
+        print("   .venv/bin/python -m pip install --timeout 180 --retries 10 --prefer-binary -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple")
     print()
-    print("If the mirror also fails, check the network connection, proxy settings, and system time.")
+    print("If multiple mirrors time out, use a more stable network or a system proxy/VPN, then run the launcher again.")
+    print("Also check proxy settings and system time.")
     if pip_index_url:
         print(f"The failed package index was: {pip_index_url}")
 
