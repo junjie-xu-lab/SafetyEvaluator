@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "safetyevaluator"
+version = "0.4.5"
+description = "A lightweight local Streamlit app for safety classification evaluation."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "junjie-xu-lab" },
+]
+keywords = [
+    "safety-evaluation",
+    "classification",
+    "streamlit",
+    "llm-safety",
+    "metrics",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = [
+    "streamlit>=1.35",
+    "pandas>=2.2",
+    "matplotlib>=3.8",
+    "openpyxl>=3.1",
+    "reportlab>=4.2",
+    "python-docx>=1.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/junjie-xu-lab/SafetyEvaluator"
+Repository = "https://github.com/junjie-xu-lab/SafetyEvaluator"
+Issues = "https://github.com/junjie-xu-lab/SafetyEvaluator/issues"
+
+[tool.setuptools.packages.find]
+include = ["safetyevaluator*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

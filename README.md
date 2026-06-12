@@ -280,6 +280,21 @@ blocked by the default execution policy. SafetyEvaluator does not require activa
 The Excel input and Excel report features use `openpyxl`, the PDF report feature uses `reportlab`, and the Word report
 feature uses `python-docx`. These dependencies are included in `requirements.txt`.
 
+For development, the project also includes `pyproject.toml`. You can install the package with test dependencies in
+editable mode:
+
+Windows PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+```
+
+macOS / Linux:
+
+```bash
+.venv/bin/python -m pip install -e ".[dev]"
+```
+
 ## Run
 
 Start the app with the Python executable inside `.venv`.
@@ -461,8 +476,12 @@ or do not need Word editing, the Markdown report remains the simplest export opt
 
 ```text
 SafetyEvaluator/
+|-- .github/
+|   `-- workflows/
+|       `-- ci.yml
 |-- README.md
 |-- LICENSE
+|-- pyproject.toml
 |-- requirements.txt
 |-- requirements-dev.txt
 |-- app.py
@@ -497,6 +516,9 @@ Run the test suite:
 python -m pip install -r requirements-dev.txt
 python -m pytest
 ```
+
+The GitHub Actions workflow in `.github/workflows/ci.yml` runs the same test suite on Windows and Linux with Python
+3.10, 3.11, and 3.12.
 
 The tests cover:
 
@@ -543,5 +565,4 @@ Possible next steps:
 - Multi-class metric views.
 - Reusable label-mapping presets that can be saved and applied across datasets.
 - Side-by-side comparison exports for selected detectors only.
-- GitHub Actions test workflow.
 - Example exported reports attached to GitHub Releases.
