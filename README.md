@@ -9,6 +9,7 @@ guard model, API provider, database, IDE, or operating system.
 
 ## Project Highlights
 
+- Public online access: [Open SafetyEvaluator](https://safetyevaluator-junjie.swoony-owl-3602.chatgpt.site).
 - Local Streamlit web app for Windows, macOS, and Linux.
 - Generic table-based workflow for safety classification results.
 - Supports CSV upload, Excel `.xlsx` upload, and pasted CSV / TSV text.
